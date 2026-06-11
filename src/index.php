@@ -1,24 +1,24 @@
 <?php
-// Configuration du dossier cible
+// Target directory configuration
 $base_dir = __DIR__ . '/music';
 $req_dir = isset($_GET['dir']) ? (string)$_GET['dir'] : '';
 
-// Sécurité : Empêcher de remonter dans l'arborescence
+// Security: Prevent directory traversal
 $req_dir = str_replace(['../', '..\\'], '', $req_dir);
 $current_path = realpath($base_dir . '/' . $req_dir);
 
-// Vérification de sécurité
+// Security check: ensure the requested path is within the base directory
 if ($current_path === false || strpos($current_path, realpath($base_dir)) !== 0) {
     $current_path = realpath($base_dir);
     $req_dir = '';
 }
 
-// Initialisation des variables pour éviter les erreurs
+// Initialize variables to prevent errors
 $folders = [];
 $mp3s = [];
 $breadcrumbs = [];
 
-// Lecture du répertoire
+// Read directory
 $items = @scandir($current_path) ?: [];
 
 foreach ($items as $item) {
@@ -28,11 +28,11 @@ foreach ($items as $item) {
     $rel_path = $req_dir !== '' ? $req_dir . '/' . $item : $item;
 
     if (is_dir($full_path)) {
-        // Recherche de l'image scrapée
+        // Search for scraped image
         $hash = md5($rel_path);
         $img_path = 'img/' . $hash . '.jpg';
         
-        // On vérifie si l'image existe et qu'elle a bien été téléchargée (taille > 0)
+        // Check if the image exists and has been downloaded (size > 0)
         $has_image = file_exists(__DIR__ . '/' . $img_path) && filesize(__DIR__ . '/' . $img_path) > 0;
 
         $folders[] = [
@@ -41,7 +41,7 @@ foreach ($items as $item) {
             'image' => $has_image ? $img_path : null
         ];
     } elseif (is_file($full_path) && strtolower(pathinfo($item, PATHINFO_EXTENSION)) === 'mp3') {
-        // Encodage pour les espaces et caractères spéciaux dans l'URL
+        // Encode spaces and special characters in URL
         $parts = explode('/', $rel_path);
         $encoded_parts = array_map('rawurlencode', $parts);
         
@@ -52,11 +52,11 @@ foreach ($items as $item) {
     }
 }
 
-// Tri alphabétique
+// Alphabetical sort
 usort($folders, fn($a, $b) => strcasecmp($a['name'], $b['name']));
 usort($mp3s, fn($a, $b) => strcasecmp($a['name'], $b['name']));
 
-// Fil d'Ariane
+// Breadcrumbs
 $path_parts = explode('/', $req_dir);
 $build_path = '';
 foreach ($path_parts as $part) {
@@ -66,7 +66,7 @@ foreach ($path_parts as $part) {
 }
 ?>
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -92,7 +92,7 @@ foreach ($path_parts as $part) {
 
 <div class="container">
     <?php if (!empty($folders)): ?>
-        <h2>Dossiers</h2>
+        <h2>Folders</h2>
         <div class="grid">
             <?php foreach ($folders as $folder): ?>
                 <a href="?dir=<?= urlencode($folder['path']) ?>" class="card">
@@ -108,7 +108,7 @@ foreach ($path_parts as $part) {
     <?php endif; ?>
 
     <?php if (!empty($mp3s)): ?>
-        <h2>Titres</h2>
+        <h2>Tracks</h2>
         <ul class="track-list">
             <?php foreach ($mp3s as $index => $mp3): ?>
                 <li class="track-item" onclick="playTrack('<?= htmlspecialchars($mp3['url'], ENT_QUOTES) ?>', '<?= htmlspecialchars($mp3['name'], ENT_QUOTES) ?>', this)">
@@ -120,22 +120,22 @@ foreach ($path_parts as $part) {
     <?php endif; ?>
     
     <?php if (empty($folders) && empty($mp3s)): ?>
-        <p style="color: var(--text-sub);">Dossier vide.</p>
+        <p style="color: var(--text-sub);">Empty folder.</p>
     <?php endif; ?>
 </div>
 
 <div id="player-bar">
-    <div id="now-playing">Aucun titre</div>
+    <div id="now-playing">No track selected</div>
     <div class="player-controls">
         <audio id="audio-element" controls controlsList="nodownload">
-            Votre navigateur ne supporte pas la balise audio.
+            Your browser does not support the audio element.
         </audio>
     </div>
     <div class="spacer"></div>
 </div>
 
 <script>
-    // Enregistrement PWA
+    // PWA Registration
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('sw.js').catch(err => {
@@ -144,7 +144,7 @@ foreach ($path_parts as $part) {
         });
     }
 
-    // Gestion du lecteur audio
+    // Audio player management
     const audio = document.getElementById('audio-element');
     const nowPlaying = document.getElementById('now-playing');
     let currentTrackItem = null;
@@ -152,7 +152,7 @@ foreach ($path_parts as $part) {
     function playTrack(url, name, element) {
         audio.src = url;
         audio.play();
-        // Retire l'extension .mp3 pour un affichage plus propre
+        // Remove .mp3 extension for cleaner display
         nowPlaying.textContent = name.replace(/\.[^/.]+$/, "");
         
         if (currentTrackItem) {
@@ -162,7 +162,7 @@ foreach ($path_parts as $part) {
         currentTrackItem = element;
     }
 
-    // Passage automatique à la piste suivante
+    // Automatically play next track
     audio.addEventListener('ended', function() {
         if (currentTrackItem && currentTrackItem.nextElementSibling) {
             currentTrackItem.nextElementSibling.click();
