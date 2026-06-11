@@ -275,3 +275,30 @@ audio::-webkit-media-controls-mute-button {
     .container { padding: 16px; }
     .grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 16px; }
     body { padding-bottom: 140px; /* More space as the player stacks */
+
+.card {
+    background-color: #181818;
+    padding: 16px;
+    border-radius: 8px;
+    transition: background 0.3s;
+}
+
+.card:hover {
+    background-color: #282828;
+}
+
+/* Image plein format sans bordures blanches */
+.folder-cover {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border-radius: 4px;
+    margin-bottom: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+}
+
+.card-title {
+    font-weight: 700;
+    font-size: 1rem;
+    color: white;
+}
