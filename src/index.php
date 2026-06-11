@@ -1,174 +1,78 @@
-<?php
-// Target directory configuration
-$base_dir = __DIR__ . '/music';
-$req_dir = isset($_GET['dir']) ? (string)$_GET['dir'] : '';
-
-// Security: Prevent directory traversal
-$req_dir = str_replace(['../', '..\\'], '', $req_dir);
-$current_path = realpath($base_dir . '/' . $req_dir);
-
-// Security check: ensure the requested path is within the base directory
-if ($current_path === false || strpos($current_path, realpath($base_dir)) !== 0) {
-    $current_path = realpath($base_dir);
-    $req_dir = '';
-}
-
-// Initialize variables to prevent errors
-$folders = [];
-$mp3s = [];
-$breadcrumbs = [];
-
-// Read directory
-$items = @scandir($current_path) ?: [];
-
-foreach ($items as $item) {
-    if ($item === '.' || $item === '..') continue;
-    
-    $full_path = $current_path . '/' . $item;
-    $rel_path = $req_dir !== '' ? $req_dir . '/' . $item : $item;
-
-    if (is_dir($full_path)) {
-        // Search for scraped image
-        $hash = md5($rel_path);
-        $img_path = 'img/' . $hash . '.jpg';
-        
-        // Check if the image exists and has been downloaded (size > 0)
-        $has_image = file_exists(__DIR__ . '/' . $img_path) && filesize(__DIR__ . '/' . $img_path) > 0;
-
-        $folders[] = [
-            'name' => $item,
-            'path' => $rel_path,
-            'image' => $has_image ? $img_path : null
-        ];
-    } elseif (is_file($full_path) && strtolower(pathinfo($item, PATHINFO_EXTENSION)) === 'mp3') {
-        // Encode spaces and special characters in URL
-        $parts = explode('/', $rel_path);
-        $encoded_parts = array_map('rawurlencode', $parts);
-        
-        $mp3s[] = [
-            'name' => $item,
-            'url' => 'music/' . implode('/', $encoded_parts)
-        ];
-    }
-}
-
-// Alphabetical sort
-usort($folders, fn($a, $b) => strcasecmp($a['name'], $b['name']));
-usort($mp3s, fn($a, $b) => strcasecmp($a['name'], $b['name']));
-
-// Breadcrumbs
-$path_parts = explode('/', $req_dir);
-$build_path = '';
-foreach ($path_parts as $part) {
-    if (empty($part)) continue;
-    $build_path .= ($build_path === '' ? '' : '/') . $part;
-    $breadcrumbs[] = ['name' => $part, 'path' => $build_path];
-}
-?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Web Player</title>
-    
-    <meta name="theme-color" content="#121212">
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="icon-192.png">
-    
     <link rel="stylesheet" href="style.php">
 </head>
 <body>
 
 <header>
-    <div class="breadcrumb">
-        <a href="?dir=">🏠 Home</a>
-        <?php foreach ($breadcrumbs as $crumb): ?>
-            <span>/</span>
-            <a href="?dir=<?= urlencode($crumb['path']) ?>"><?= htmlspecialchars($crumb['name']) ?></a>
-        <?php endforeach; ?>
+    <div class="breadcrumb" id="breadcrumb">
+        <a href="#" onclick="loadContent('')">🏠 Home</a>
     </div>
 </header>
 
-<div class="container">
-    <?php if (!empty($folders)): ?>
-        <h2>Folders</h2>
-        <div class="grid">
-            <?php foreach ($folders as $folder): ?>
-                <a href="?dir=<?= urlencode($folder['path']) ?>" class="card">
-                    <?php if ($folder['image']): ?>
-                        <img src="<?= htmlspecialchars($folder['image']) ?>" alt="cover" class="folder-cover">
-                    <?php else: ?>
-                        <div class="icon-folder">📁</div>
-                    <?php endif; ?>
-                    <div class="card-title"><?= htmlspecialchars($folder['name']) ?></div>
-                </a>
-            <?php endforeach; ?>
-        </div>
-    <?php endif; ?>
-
-    <?php if (!empty($mp3s)): ?>
-        <h2>Tracks</h2>
-        <ul class="track-list">
-            <?php foreach ($mp3s as $index => $mp3): ?>
-                <li class="track-item" onclick="playTrack('<?= htmlspecialchars($mp3['url'], ENT_QUOTES) ?>', '<?= htmlspecialchars($mp3['name'], ENT_QUOTES) ?>', this)">
-                    <span class="track-icon">🎵</span>
-                    <span class="track-name"><?= htmlspecialchars($mp3['name']) ?></span>
-                </li>
-            <?php endforeach; ?>
-        </ul>
-    <?php endif; ?>
-    
-    <?php if (empty($folders) && empty($mp3s)): ?>
-        <p style="color: var(--text-sub);">Empty folder.</p>
-    <?php endif; ?>
-</div>
+<div class="container" id="main-content">
+    </div>
 
 <div id="player-bar">
     <div id="now-playing">No track selected</div>
     <div class="player-controls">
-        <audio id="audio-element" controls controlsList="nodownload">
-            Your browser does not support the audio element.
-        </audio>
+        <audio id="audio-element" controls controlsList="nodownload"></audio>
     </div>
     <div class="spacer"></div>
 </div>
 
 <script>
-    // PWA Registration
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js').catch(err => {
-                console.log('ServiceWorker registration failed: ', err);
+    // Chargement dynamique du contenu sans recharger la page
+    function loadContent(dir) {
+        fetch('api.php?dir=' + encodeURIComponent(dir))
+            .then(response => response.json())
+            .then(data => {
+                const container = document.getElementById('main-content');
+                container.innerHTML = ''; // Nettoyer
+
+                // Affichage des dossiers
+                if (data.folders.length > 0) {
+                    const grid = document.createElement('div');
+                    grid.className = 'grid';
+                    data.folders.forEach(folder => {
+                        grid.innerHTML += `
+                            <a href="#" class="card" onclick="loadContent('${folder.path}')">
+                                ${folder.image ? `<img src="${folder.image}" class="folder-cover">` : `<div class="icon-folder">📁</div>`}
+                                <div class="card-title">${folder.name}</div>
+                            </a>`;
+                    });
+                    container.appendChild(grid);
+                }
+
+                // Affichage des titres
+                if (data.mp3s.length > 0) {
+                    const list = document.createElement('ul');
+                    list.className = 'track-list';
+                    data.mp3s.forEach(mp3 => {
+                        list.innerHTML += `
+                            <li class="track-item" onclick="playTrack('${mp3.url}', '${mp3.name.replace(/'/g, "\\'")}', this)">
+                                🎵 ${mp3.name}
+                            </li>`;
+                    });
+                    container.appendChild(list);
+                }
             });
-        });
     }
 
-    // Audio player management
+    // Lecteur
     const audio = document.getElementById('audio-element');
-    const nowPlaying = document.getElementById('now-playing');
-    let currentTrackItem = null;
-
     function playTrack(url, name, element) {
         audio.src = url;
         audio.play();
-        // Remove .mp3 extension for cleaner display
-        nowPlaying.textContent = name.replace(/\.[^/.]+$/, "");
-        
-        if (currentTrackItem) {
-            currentTrackItem.classList.remove('active');
-        }
-        element.classList.add('active');
-        currentTrackItem = element;
+        document.getElementById('now-playing').textContent = name;
     }
 
-    // Automatically play next track
-    audio.addEventListener('ended', function() {
-        if (currentTrackItem && currentTrackItem.nextElementSibling) {
-            currentTrackItem.nextElementSibling.click();
-        }
-    });
+    // Chargement initial
+    loadContent('');
 </script>
-
 </body>
 </html>
