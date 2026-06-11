@@ -1,19 +1,19 @@
 <?php
-// Configuration : ici on reste sur le montage web pour que Apache puisse servir les fichiers
+// Configuration du dossier cible
 $base_dir = __DIR__ . '/music';
 $req_dir = isset($_GET['dir']) ? (string)$_GET['dir'] : '';
 
-// Sécurité : Empêcher de remonter dans l'arborescence (Path Traversal)
+// Sécurité : Empêcher de remonter dans l'arborescence
 $req_dir = str_replace(['../', '..\\'], '', $req_dir);
 $current_path = realpath($base_dir . '/' . $req_dir);
 
-// Vérification que le chemin demandé est bien dans le dossier de base
+// Vérification de sécurité
 if ($current_path === false || strpos($current_path, realpath($base_dir)) !== 0) {
     $current_path = realpath($base_dir);
     $req_dir = '';
 }
 
-// Initialisation des variables
+// Initialisation des variables pour éviter les erreurs
 $folders = [];
 $mp3s = [];
 $breadcrumbs = [];
@@ -28,11 +28,11 @@ foreach ($items as $item) {
     $rel_path = $req_dir !== '' ? $req_dir . '/' . $item : $item;
 
     if (is_dir($full_path)) {
-        // Recherche de l'image liée au dossier (générée par le scraper)
+        // Recherche de l'image scrapée
         $hash = md5($rel_path);
         $img_path = 'img/' . $hash . '.jpg';
         
-        // Vérification de l'existence et si le fichier n'est pas vide
+        // On vérifie si l'image existe et qu'elle a bien été téléchargée (taille > 0)
         $has_image = file_exists(__DIR__ . '/' . $img_path) && filesize(__DIR__ . '/' . $img_path) > 0;
 
         $folders[] = [
@@ -41,6 +41,7 @@ foreach ($items as $item) {
             'image' => $has_image ? $img_path : null
         ];
     } elseif (is_file($full_path) && strtolower(pathinfo($item, PATHINFO_EXTENSION)) === 'mp3') {
+        // Encodage pour les espaces et caractères spéciaux dans l'URL
         $parts = explode('/', $rel_path);
         $encoded_parts = array_map('rawurlencode', $parts);
         
@@ -75,7 +76,7 @@ foreach ($path_parts as $part) {
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192.png">
     
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.php">
 </head>
 <body>
 
@@ -143,7 +144,7 @@ foreach ($path_parts as $part) {
         });
     }
 
-    // Lecteur Audio
+    // Gestion du lecteur audio
     const audio = document.getElementById('audio-element');
     const nowPlaying = document.getElementById('now-playing');
     let currentTrackItem = null;
@@ -151,7 +152,8 @@ foreach ($path_parts as $part) {
     function playTrack(url, name, element) {
         audio.src = url;
         audio.play();
-        nowPlaying.textContent = name.replace('.mp3', '');
+        // Retire l'extension .mp3 pour un affichage plus propre
+        nowPlaying.textContent = name.replace(/\.[^/.]+$/, "");
         
         if (currentTrackItem) {
             currentTrackItem.classList.remove('active');
@@ -160,6 +162,7 @@ foreach ($path_parts as $part) {
         currentTrackItem = element;
     }
 
+    // Passage automatique à la piste suivante
     audio.addEventListener('ended', function() {
         if (currentTrackItem && currentTrackItem.nextElementSibling) {
             currentTrackItem.nextElementSibling.click();
