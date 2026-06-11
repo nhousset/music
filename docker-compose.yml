@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  web:
+    image: php:8.2-apache
+    container_name: spotify_clone
+    ports:
+      - "8080:80"
+    volumes:
+      # Code source de l'application
+      - ./src:/var/www/html
+      # Montage du dossier MP3 dans le répertoire web
+      - /MP3/MP3:/var/www/html/music:ro
+    restart: unless-stopped
